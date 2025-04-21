@@ -4,7 +4,8 @@ module SidekiqSqsProcessor
     attr_accessor :aws_access_key_id, :aws_secret_access_key, :aws_credentials
     attr_reader :aws_region, :queue_urls, :max_number_of_messages,
                 :visibility_timeout, :wait_time_seconds, :poller_thread_count,
-                :error_handler
+                :error_handler, :polling_enabled, :polling_type, :poll_on_startup,
+                :polling_frequency
 
     # Worker configuration
     attr_accessor :worker_retry_count, :worker_queue_name, :logger
@@ -19,6 +20,10 @@ module SidekiqSqsProcessor
       @worker_retry_count = 25
       @worker_queue_name = "default"
       @error_handler = default_error_handler
+      @polling_enabled = true
+      @polling_type = :continuous
+      @poll_on_startup = true
+      @polling_frequency = 60 # seconds
     end
 
     def aws_region=(region)
@@ -56,6 +61,26 @@ module SidekiqSqsProcessor
       end
       @error_handler = handler
     end
+    
+    def polling_enabled=(value)
+      @polling_enabled = !!value
+    end
+    
+    def polling_type=(value)
+      value = value.to_sym if value.respond_to?(:to_sym)
+      unless [:continuous, :scheduled].include?(value)
+        raise ArgumentError, "polling_type must be :continuous or :scheduled"
+      end
+      @polling_type = value
+    end
+    
+    def poll_on_startup=(value)
+      @poll_on_startup = !!value
+    end
+    
+    def polling_frequency=(value)
+      @polling_frequency = [value.to_i, 1].max
+    end
 
     def handle_error(error, context = {})
       if @error_handler
@@ -89,7 +114,15 @@ module SidekiqSqsProcessor
       if !visibility_timeout.positive?
         errors << "visibility_timeout must be positive"
       end
-
+      
+      if ![:continuous, :scheduled].include?(polling_type)
+        errors << "polling_type must be :continuous or :scheduled"
+      end
+      
+      if !polling_frequency.positive?
+        errors << "polling_frequency must be positive"
+      end
+      
       # Queue URLs should be checked last
       if queue_urls.empty?
         errors << "queue_urls is empty"
