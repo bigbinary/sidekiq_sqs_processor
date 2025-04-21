@@ -1,0 +1,66 @@
+
+# SidekiqSqsProcessor configuration
+SidekiqSqsProcessor.configure do |config|
+  # AWS credentials and region
+  # By default, SidekiqSqsProcessor will use the following credential sources (in order):
+  # 1. AWS SDK's default credential provider chain:
+  #    - Environment variables (AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY)
+  #    - Shared credentials file (~/.aws/credentials)
+  #    - EC2 instance profile or ECS task role
+  #
+  # Uncomment the lines below to explicitly set credentials
+  # config.aws_access_key_id = ENV['AWS_ACCESS_KEY_ID']
+  # config.aws_secret_access_key = ENV['AWS_SECRET_ACCESS_KEY']
+  
+  # AWS region for SQS queues
+  config.aws_region = '<%= aws_region %>'
+
+  # SQS queue URLs (required)
+  # A list of SQS queue URLs to poll for messages
+  config.queue_urls = <%= queue_urls %>
+  
+  # SQS message options
+  config.visibility_timeout = 300    # 5 minutes
+  config.wait_time_seconds = 20      # 20 seconds (long polling)
+  config.max_number_of_messages = 10 # Max messages per receive call
+  
+  # Polling configuration
+  config.polling_type = <%= polling_type %> # :continuous or :scheduled
+  config.polling_frequency = 60      # Only used for scheduled polling (in seconds)
+  
+  <% if Rails.env.development? %>
+  # Disable polling in development by default
+  # Set ENABLE_SQS_POLLING_IN_DEV=true to enable
+  config.polling_enabled = ENV['ENABLE_SQS_POLLING_IN_DEV'] == 'true'
+  <% else %>
+  config.polling_enabled = true     # Enable polling in production
+  <% end %>
+  
+  # Start polling when the application starts
+  config.poll_on_startup = true
+  
+  # Sidekiq options
+  config.worker_queue_name = 'sqs_default' # Default queue name for SQS worker jobs
+  config.worker_retry_count = 5            # Number of retries for failed jobs
+  
+  # Default message routing
+  # If set, all messages will be routed to this worker class
+  # If nil, will attempt to determine worker from message content
+  # config.default_worker_class = 'ExampleSqsWorker'
+  
+  # Custom error handling (optional)
+  # Uncomment to add custom error reporting (e.g., to a monitoring service)
+  # config.error_handler = ->(error, context) do
+  #   # Report to your error monitoring service
+  #   Raven.capture_exception(error, extra: context) if defined?(Raven)
+  #   Rails.logger.error("SQS Error: #{error.message}\nContext: #{context.inspect}")
+  # end
+  
+  # Set logger - by default uses Rails.logger
+  config.logger = Rails.logger
+  config.log_level = Rails.env.production? ? Logger::INFO : Logger::DEBUG
+end
+
+# If using sidekiq-cron for scheduled polling, the Railtie will
+# automatically set up the cron job based on your configuration.
+

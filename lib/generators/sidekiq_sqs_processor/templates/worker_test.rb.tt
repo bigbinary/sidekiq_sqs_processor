@@ -1,0 +1,50 @@
+
+require 'test_helper'
+
+class <%= worker_class_name %>Test < ActiveSupport::TestCase
+  setup do
+    @worker = <%= worker_class_name %>.new
+  end
+  
+  test "processes a hash message correctly" do
+    message = { 'type' => 'user_created', 'data' => { 'name' => 'Test User' } }
+    
+    @worker.expects(:process_user_created).with(message['data'])
+    result = @worker.process_message(message)
+    
+    assert_equal({ status: 'success' }, result)
+  end
+  
+  test "processes a string message correctly" do
+    message = 'test message'
+    
+    @worker.expects(:process_generic_message).with(message)
+    result = @worker.process_message(message)
+    
+    assert_equal({ status: 'success' }, result)
+  end
+  
+  test "deletes the message from SQS when processing succeeds" do
+    # Create a test message that simulates SQS format
+    message_data = {
+      'receipt_handle' => 'test-receipt-handle',
+      'queue_url' => 'https://sqs.us-east-1.amazonaws.com/123456789012/test-queue',
+      'message_id' => 'test-message-id',
+      'body' => '{"type":"test","data":{"id":123}}'
+    }
+    
+    # Mock the SQS client
+    sqs_client = mock()
+    SidekiqSqsProcessor.stubs(:sqs_client).returns(sqs_client)
+    
+    # Expect delete_message to be called
+    sqs_client.expects(:delete_message).with(
+      queue_url: message_data['queue_url'],
+      receipt_handle: message_data['receipt_handle']
+    )
+    
+    # Perform the job
+    @worker.perform(message_data)
+  end
+end
+

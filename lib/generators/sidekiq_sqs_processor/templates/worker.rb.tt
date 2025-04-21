@@ -1,0 +1,59 @@
+
+class <%= worker_class_name %> < SidekiqSqsProcessor::BaseWorker
+  # Configure Sidekiq options if needed
+  sidekiq_options queue: '<%= queue_name %>'<%= retry_option %>
+  
+  # Process an SQS message
+  # @param message_body [Hash, String] The parsed message body
+  # @return [Any] Result of processing (will be logged)
+  def process_message(message_body)
+    # Log the message content
+    logger.info("Processing message: #{message_body.inspect}")
+    
+    # Your message processing logic goes here
+    # 
+    # Example: Handle different message types based on content
+    if message_body.is_a?(Hash)
+      case message_body['type']
+      when 'user_created'
+        process_user_created(message_body['data'])
+      when 'order_placed'
+        process_order_placed(message_body['data'])
+      else
+        process_generic_hash(message_body)
+      end
+    else
+      process_generic_message(message_body)
+    end
+    
+    # Return success result (optional)
+    { status: 'success' }
+  end
+  
+  private
+  
+  def process_user_created(user_data)
+    logger.info("Processing user created event")
+    # Your user creation logic here
+    # Example:
+    # User.create!(user_data)
+  end
+  
+  def process_order_placed(order_data)
+    logger.info("Processing order placed event")
+    # Your order processing logic here
+    # Example:
+    # OrderProcessor.new(order_data).process
+  end
+  
+  def process_generic_hash(data)
+    logger.info("Processing generic hash data with keys: #{data.keys.join(', ')}")
+    # Generic hash handling
+  end
+  
+  def process_generic_message(message)
+    logger.info("Processing generic message: #{message}")
+    # Generic message handling
+  end
+end
+

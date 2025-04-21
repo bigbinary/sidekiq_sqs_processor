@@ -1,0 +1,54 @@
+
+require 'rails_helper'
+
+RSpec.describe <%= worker_class_name %> do
+  let(:worker) { described_class.new }
+  
+  describe '#process_message' do
+    context 'with a hash message' do
+      let(:message) { { 'type' => 'user_created', 'data' => { 'name' => 'Test User' } } }
+      
+      it 'processes the message correctly' do
+        expect(worker).to receive(:process_user_created).with(message['data'])
+        result = worker.process_message(message)
+        expect(result).to eq(status: 'success')
+      end
+    end
+    
+    context 'with a string message' do
+      let(:message) { 'test message' }
+      
+      it 'processes the message correctly' do
+        expect(worker).to receive(:process_generic_message).with(message)
+        result = worker.process_message(message)
+        expect(result).to eq(status: 'success')
+      end
+    end
+  end
+  
+  describe 'SQS integration' do
+    it 'correctly deletes the message from SQS when processing succeeds' do
+      # Create a test message that simulates SQS format
+      message_data = {
+        'receipt_handle' => 'test-receipt-handle',
+        'queue_url' => 'https://sqs.us-east-1.amazonaws.com/123456789012/test-queue',
+        'message_id' => 'test-message-id',
+        'body' => '{"type":"test","data":{"id":123}}'
+      }
+      
+      # Mock the SQS client
+      sqs_client = instance_double(Aws::SQS::Client)
+      allow(SidekiqSqsProcessor).to receive(:sqs_client).and_return(sqs_client)
+      
+      # Expect delete_message to be called
+      expect(sqs_client).to receive(:delete_message).with(
+        queue_url: message_data['queue_url'],
+        receipt_handle: message_data['receipt_handle']
+      )
+      
+      # Perform the job
+      worker.perform(message_data)
+    end
+  end
+end
+
