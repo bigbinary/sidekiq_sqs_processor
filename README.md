@@ -34,7 +34,7 @@ Or install it yourself:
 
 ```bash
 $ gem install sidekiq_sqs_processor
-37|```
+```
 
 ## Dependencies
 
