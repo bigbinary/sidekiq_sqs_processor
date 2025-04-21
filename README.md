@@ -1,4 +1,4 @@
-# SidekiqSqsProcessor
+# Sidekiq SQS Processor
 
 [![Gem Version](https://badge.fury.io/rb/sidekiq_sqs_processor.svg)](https://badge.fury.io/rb/sidekiq_sqs_processor)
 [![Build Status](https://github.com/yourusername/sidekiq_sqs_processor/workflows/CI/badge.svg)](https://github.com/yourusername/sidekiq_sqs_processor/actions)
