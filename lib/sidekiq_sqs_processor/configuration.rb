@@ -5,7 +5,7 @@ module SidekiqSqsProcessor
     attr_reader :aws_region, :queue_urls, :max_number_of_messages,
                 :visibility_timeout, :wait_time_seconds, :poller_thread_count,
                 :error_handler, :polling_enabled, :polling_type, :poll_on_startup,
-                :polling_frequency
+                :polling_frequency, :log_level
 
     # Worker configuration
     attr_accessor :worker_retry_count, :worker_queue_name, :logger
@@ -24,6 +24,7 @@ module SidekiqSqsProcessor
       @polling_type = :continuous
       @poll_on_startup = true
       @polling_frequency = 60 # seconds
+      @log_level = Logger::INFO
     end
 
     def aws_region=(region)
@@ -81,7 +82,29 @@ module SidekiqSqsProcessor
     def polling_frequency=(value)
       @polling_frequency = [value.to_i, 1].max
     end
-
+    
+    def log_level=(level)
+      if level.is_a?(Integer) && (0..5).include?(level)
+        @log_level = level
+      elsif level.is_a?(Symbol) || level.is_a?(String)
+        level_map = {
+          debug: Logger::DEBUG,
+          info: Logger::INFO,
+          warn: Logger::WARN,
+          error: Logger::ERROR,
+          fatal: Logger::FATAL,
+          unknown: Logger::UNKNOWN
+        }
+        sym_level = level.to_sym.downcase
+        if level_map.key?(sym_level)
+          @log_level = level_map[sym_level]
+        else
+          raise ArgumentError, "Invalid log level: #{level}. Valid levels are: #{level_map.keys.join(', ')}"
+        end
+      else
+        raise ArgumentError, "Log level must be an Integer (0-5) or one of: debug, info, warn, error, fatal, unknown"
+      end
+    end
     def handle_error(error, context = {})
       if @error_handler
         @error_handler.call(error, context)

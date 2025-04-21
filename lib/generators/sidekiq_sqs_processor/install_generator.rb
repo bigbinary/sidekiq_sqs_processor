@@ -13,6 +13,9 @@ module SidekiqSqsProcessor
       class_option :continuous, type: :boolean, default: true,
                    desc: "Use continuous polling (true) or scheduled polling (false)"
                    
+      class_option :queue_name, type: :string, default: "default",
+                   desc: "Default Sidekiq queue name for the worker"
+                   
       class_option :aws_region, type: :string, default: 'us-east-1',
                    desc: "AWS region for SQS queues"
       
@@ -49,6 +52,18 @@ module SidekiqSqsProcessor
       
       def aws_region
         options[:aws_region]
+      end
+      
+      def worker_class_name
+        "ExampleSqsWorker"
+      end
+      
+      def queue_name
+        options[:queue_name]
+      end
+      
+      def retry_option
+        ", retry: 25" # Default Sidekiq retry behavior
       end
     end
   end
