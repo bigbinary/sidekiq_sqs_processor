@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 require 'singleton'
 
 module SidekiqSqsProcessor
@@ -5,89 +7,103 @@ module SidekiqSqsProcessor
     include Singleton
 
     def initialize
+      puts "[SidekiqSqsProcessor] Initializing ContinuousPoller"
       @running = false
       @threads = []
       @mutex = Mutex.new
     end
 
     def start
+      puts "[SidekiqSqsProcessor] Starting ContinuousPoller"
+      puts "[SidekiqSqsProcessor] Current state: running=#{@running}, threads=#{@threads.count}"
+      
       return false if running?
 
       @mutex.synchronize do
-        @running = true
-        start_polling_threads
+        puts "[SidekiqSqsProcessor] Inside start mutex"
+        begin
+          @running = true
+          start_polling_threads
+          puts "[SidekiqSqsProcessor] Polling threads started successfully"
+          true
+        rescue => e
+          puts "[SidekiqSqsProcessor] ERROR starting polling threads: #{e.class} - #{e.message}"
+          puts "[SidekiqSqsProcessor] #{e.backtrace.join("\n")}"
+          @running = false
+          false
+        end
       end
-
-      true
     end
 
     def stop
+      puts "[SidekiqSqsProcessor] Stopping ContinuousPoller"
       return false unless running?
 
       @mutex.synchronize do
-        @running = false
-        stop_polling_threads
+        begin
+          @running = false
+          stop_polling_threads
+          puts "[SidekiqSqsProcessor] Polling threads stopped successfully"
+          true
+        rescue => e
+          puts "[SidekiqSqsProcessor] ERROR stopping polling threads: #{e.class} - #{e.message}"
+          puts "[SidekiqSqsProcessor] #{e.backtrace.join("\n")}"
+          false
+        end
       end
-
-      true
     end
 
     def running?
       @running
     end
 
-    def stats
-      {
-        running: running?,
-        threads: @threads.count,
-        queue_urls: SidekiqSqsProcessor.configuration.queue_urls
-      }
-    end
-
     private
 
     def start_polling_threads
+      puts "[SidekiqSqsProcessor] Starting polling threads"
+      puts "[SidekiqSqsProcessor] Queue URLs: #{SidekiqSqsProcessor.configuration.queue_urls.inspect}"
+      
       SidekiqSqsProcessor.configuration.queue_urls.each do |queue_url|
-        SidekiqSqsProcessor.configuration.poller_thread_count.times do
-          thread = Thread.new do
-            poll_queue(queue_url) while running?
-          end
-          @threads << thread
+        thread = Thread.new do
+          Thread.current.name = "SQS-Poller-#{queue_url}"
+          puts "[SidekiqSqsProcessor] Started polling thread for queue: #{queue_url}"
+          
+          poll_queue(queue_url) while running?
         end
+        @threads << thread
       end
     end
 
     def stop_polling_threads
+      puts "[SidekiqSqsProcessor] Stopping polling threads"
       @threads.each(&:exit)
       @threads.each(&:join)
       @threads.clear
     end
 
     def poll_queue(queue_url)
-      response = receive_messages(queue_url)
-      process_messages(response.messages, queue_url)
-    rescue StandardError => e
-      SidekiqSqsProcessor.handle_error(e, { queue_url: queue_url })
-      sleep(1) # Brief pause before retrying
+      begin
+        response = receive_messages(queue_url)
+        process_messages(response.messages, queue_url)
+      rescue StandardError => e
+        SidekiqSqsProcessor.handle_error(e, { queue_url: queue_url })
+      end
     end
 
     def receive_messages(queue_url)
       SidekiqSqsProcessor.sqs_client.receive_message(
         queue_url: queue_url,
-        max_number_of_messages: SidekiqSqsProcessor.configuration.max_number_of_messages,
-        visibility_timeout: SidekiqSqsProcessor.configuration.visibility_timeout,
-        wait_time_seconds: SidekiqSqsProcessor.configuration.wait_time_seconds,
+        max_number_of_messages: 10,
+        visibility_timeout: 30,
+        wait_time_seconds: 1,
         attribute_names: ["All"],
         message_attribute_names: ["All"]
       )
     end
+
     def process_messages(messages, queue_url)
       messages.each do |message|
-        message_data = nil
-        worker_class = nil
-        
         begin
-          # Convert to a hash for passing to the worker
           message_data = {
             "message_id" => message.message_id,
             "receipt_handle" => message.receipt_handle,
@@ -97,41 +113,35 @@ module SidekiqSqsProcessor
             "md5_of_body" => message.md5_of_body,
             "queue_url" => queue_url
           }
-          
-          worker_class = find_worker_for_message(message)
+
+          worker_class = find_worker_for_message(message, queue_url)
           if worker_class
-            # Simply call perform_async, which will be handled appropriately in test vs prod
             worker_class.perform_async(message_data)
+          else
+            SidekiqSqsProcessor.handle_error(
+              StandardError.new("No worker found for message"),
+              { message: message_data, queue_url: queue_url }
+            )
           end
         rescue StandardError => e
-          # Handle worker error without re-raising
-          data_to_pass = message_data || message
-          handle_worker_error(e, worker_class&.name, data_to_pass, queue_url)
+          SidekiqSqsProcessor.handle_error(e, { message: message, queue_url: queue_url })
         end
       end
     end
-    
-    def handle_worker_error(error, worker_name, message, queue_url)
-      context = {
-        queue_url: queue_url,
-        worker: worker_name || "Unknown",
-        message: message
-      }
-      SidekiqSqsProcessor.handle_error(error, context)
-    end
-    def find_worker_for_message(message)
-      # Default to using the queue name as the worker class name
-      # This can be overridden in subclasses for custom routing logic
-      worker_name = message.message_attributes&.dig("worker_class", "string_value")
-      worker_name ||= queue_name_to_worker_name(message.queue_url)
-      
-      SidekiqSqsProcessor.find_worker_class(worker_name)
-    end
 
-    def queue_name_to_worker_name(queue_url)
-      # Convert 'my-queue-name' to 'MyQueueNameWorker'
-      queue_name = queue_url.split('/').last
-      "#{queue_name.split('-').map(&:capitalize).join}Worker"
+    def find_worker_for_message(message, queue_url)
+      # First try to get worker class from message attributes
+      worker_name = message.message_attributes&.dig("worker_class", "string_value")
+
+      # If not found in message, use the configured mapping
+      worker_name ||= SidekiqSqsProcessor.configuration.worker_class_for_queue(queue_url)
+
+      # Convert string to class if needed
+      if worker_name.is_a?(String)
+        worker_name.constantize
+      else
+        worker_name
+      end
     end
   end
 end

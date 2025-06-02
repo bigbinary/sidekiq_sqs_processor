@@ -1,9 +1,9 @@
 PATH
   remote: .
   specs:
-    sidekiq_sqs_processor (0.1.0)
+    sidekiq_sqs_processor (0.1.1)
       aws-sdk-sqs (~> 1.0)
-      rails (~> 8.0)
+      rails (>= 7.0)
       sidekiq (~> 7.0)
 
 GEM

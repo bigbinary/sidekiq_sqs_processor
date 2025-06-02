@@ -21,7 +21,7 @@ A Ruby gem that seamlessly integrates Amazon SQS with Sidekiq for efficient and 
 Add this line to your application's Gemfile:
 
 ```ruby
-gem 'sidekiq_sqs_processor'
+gem 'sidekiq-sqs-processor'
 ```
 
 And then execute:
@@ -67,9 +67,24 @@ SidekiqSqsProcessor.configure do |config|
   config.queue_urls = [
     'https://sqs.us-east-1.amazonaws.com/123456789012/my-queue'
   ]
-  
+
   # Polling configuration
   config.polling_type = :continuous
+
+  # Map queue URLs to worker classes
+  config.queue_workers = {
+    'https://sqs.us-east-1.amazonaws.com/123456789012/queue1' => 'Queue1Worker',
+    'https://sqs.us-east-1.amazonaws.com/123456789012/queue2' => 'Queue2Worker'
+  }
+
+  # Optional: Set custom logger
+  config.logger = Rails.logger
+
+  # Optional: Set custom error handler
+  config.error_handler = ->(error, context) do
+    # Handle errors (e.g., report to monitoring service)
+    Rails.logger.error("SQS Error: #{error.message}\nContext: #{context.inspect}")
+  end
 end
 ```
 
@@ -88,13 +103,13 @@ SidekiqSqsProcessor.configure do |config|
   config.queue_urls = [
     'https://sqs.us-east-1.amazonaws.com/123456789012/my-queue'
   ]
-  
+
   # Start polling when Sidekiq starts
   Sidekiq.configure_server do |sidekiq_config|
     sidekiq_config.on(:startup) do
       SidekiqSqsProcessor.start_continuous_poller
     end
-    
+
     sidekiq_config.on(:shutdown) do
       SidekiqSqsProcessor.stop_continuous_poller
     end
@@ -124,10 +139,10 @@ class MyWorker < SidekiqSqsProcessor::BaseWorker
   # Override the process_message method to handle your SQS messages
   def process_message(message_body)
     # message_body is already parsed from JSON if it was a JSON string
-    
+
     # Your processing logic here
     User.find_by(id: message_body['user_id'])&.notify(message_body['message'])
-    
+
     # Return a result (optional)
     { status: 'success' }
   end
@@ -148,9 +163,9 @@ class OrderProcessor < SidekiqSqsProcessor::BaseWorker
       logger.error("Invalid order message format: #{message_body.inspect}")
     end
   end
-  
+
   private
-  
+
   def process_order(order_id, items)
     # Your order processing logic
     Order.process(order_id, items)
@@ -174,7 +189,7 @@ class EventProcessor < SidekiqSqsProcessor::BaseWorker
       logger.warn("Unknown event type: #{message_body['event_type']}")
     end
   end
-  
+
   # ... processing methods ...
 end
 ```
@@ -188,7 +203,7 @@ class NotificationProcessor < SidekiqSqsProcessor::BaseWorker
   def process_message(message_body)
     # For an SNS message, the SNS envelope has been removed
     # and message_body is the parsed content of the SNS Message field
-    
+
     logger.info("Processing notification: #{message_body.inspect}")
     # ... your processing logic ...
   end
@@ -202,7 +217,7 @@ You can also enqueue messages directly to a worker without going through SQS:
 ```ruby
 # Enqueue a message to a specific worker
 SidekiqSqsProcessor.enqueue_message(
-  MyWorker, 
+  MyWorker,
   { order_id: 123, items: ['item1', 'item2'] }
 )
 ```
@@ -312,4 +327,3 @@ Bug reports and pull requests are welcome on GitHub at https://github.com/yourus
 ## License
 
 The gem is available as open source under the terms of the [MIT License](https://opensource.org/licenses/MIT).
-
