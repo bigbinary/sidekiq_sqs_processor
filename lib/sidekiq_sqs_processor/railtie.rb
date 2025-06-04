@@ -38,8 +38,8 @@ module SidekiqSqsProcessor
                 begin
                   puts "[SidekiqSqsProcessor] Initializing SQS poller in background thread..."
                   
-                  # Wait for up to 30 seconds for configuration to be ready
-                  30.times do |i|
+                  # Wait for up to 2 seconds for configuration to be ready
+                  2.times do |i|
                     if SidekiqSqsProcessor.configuration.ready_for_polling?
                       puts "[SidekiqSqsProcessor] Configuration is ready, starting poller..."
                       if SidekiqSqsProcessor.start_continuous_poller
@@ -49,14 +49,14 @@ module SidekiqSqsProcessor
                       end
                       break
                     else
-                      puts "[SidekiqSqsProcessor] Waiting for configuration to be ready... (#{i+1}/30)" if i % 5 == 0
+                      puts "[SidekiqSqsProcessor] Waiting for configuration to be ready... (#{i+1}/2)" if i % 1 == 0
                       sleep 1
                     end
                   end
 
                   # Final check after timeout
                   unless SidekiqSqsProcessor.configuration.ready_for_polling?
-                    puts "[SidekiqSqsProcessor] WARNING: Configuration not ready after 30 seconds"
+                    puts "[SidekiqSqsProcessor] WARNING: Configuration not ready after 2 seconds"
                     puts "[SidekiqSqsProcessor] WARNING: SQS polling will not start"
                     puts "[SidekiqSqsProcessor] WARNING: Current configuration state:"
                     puts "[SidekiqSqsProcessor] Queue workers: #{SidekiqSqsProcessor.configuration.queue_workers.inspect}"
