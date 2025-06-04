@@ -44,12 +44,18 @@ module SidekiqSqsProcessor
       @queue_workers.keys
     end
 
+    def register_worker(queue_url, worker_class)
+      @queue_workers[queue_url] = worker_class
+      puts "[SidekiqSqsProcessor] Registered worker #{worker_class} for queue #{queue_url}"
+    end
+
     def worker_class_for_queue(queue_url)
-      if worker = @queue_workers[queue_url]
-        puts "[SidekiqSqsProcessor] Found worker #{worker} for queue #{queue_url}"
-      else
+      worker = @queue_workers[queue_url]
+      
+      if worker.nil?
         puts "[SidekiqSqsProcessor] No worker found for queue #{queue_url}"
       end
+      
       worker
     end
   end

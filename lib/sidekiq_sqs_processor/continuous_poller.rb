@@ -82,7 +82,7 @@ module SidekiqSqsProcessor
     end
 
     def poll_queue(queue_url)
-      begin
+      begin 
         response = receive_messages(queue_url)
         process_messages(response.messages, queue_url)
       rescue StandardError => e
