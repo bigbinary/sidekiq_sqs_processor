@@ -42,8 +42,11 @@ module SidekiqSqsProcessor
                   30.times do |i|
                     if SidekiqSqsProcessor.configuration.ready_for_polling?
                       puts "[SidekiqSqsProcessor] Configuration is ready, starting poller..."
-                      SidekiqSqsProcessor.start_continuous_poller
-                      puts "[SidekiqSqsProcessor] Poller started successfully"
+                      if SidekiqSqsProcessor.start_continuous_poller
+                        puts "[SidekiqSqsProcessor] Poller started successfully"
+                      else
+                        puts "[SidekiqSqsProcessor] WARNING: Poller failed to start but Sidekiq will continue running"
+                      end
                       break
                     else
                       puts "[SidekiqSqsProcessor] Waiting for configuration to be ready... (#{i+1}/30)" if i % 5 == 0
@@ -57,10 +60,13 @@ module SidekiqSqsProcessor
                     puts "[SidekiqSqsProcessor] WARNING: SQS polling will not start"
                     puts "[SidekiqSqsProcessor] WARNING: Current configuration state:"
                     puts "[SidekiqSqsProcessor] Queue workers: #{SidekiqSqsProcessor.configuration.queue_workers.inspect}"
+                    puts "[SidekiqSqsProcessor] AWS Region: #{SidekiqSqsProcessor.configuration.aws_region}"
+                    puts "[SidekiqSqsProcessor] Sidekiq will continue running without SQS polling"
                   end
                 rescue => e
                   puts "[SidekiqSqsProcessor] ERROR: Failed to start poller: #{e.class} - #{e.message}"
                   puts "[SidekiqSqsProcessor] ERROR: Backtrace: #{e.backtrace.join("\n")}"
+                  puts "[SidekiqSqsProcessor] WARNING: Sidekiq will continue running without SQS polling"
                   # Log the error but don't crash the thread
                 end
               end

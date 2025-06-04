@@ -22,6 +22,25 @@ module SidekiqSqsProcessor
       @mutex.synchronize do
         puts "[SidekiqSqsProcessor] Inside start mutex"
         begin
+          # Validate configuration before starting
+          unless SidekiqSqsProcessor.configuration.ready_for_polling?
+            puts "[SidekiqSqsProcessor] WARNING: Configuration not ready for polling. Skipping poller start."
+            puts "[SidekiqSqsProcessor] Queue workers: #{SidekiqSqsProcessor.configuration.queue_workers.inspect}"
+            return false
+          end
+
+          # Validate AWS credentials
+          begin
+            SidekiqSqsProcessor.sqs_client.get_queue_attributes(
+              queue_url: SidekiqSqsProcessor.configuration.queue_urls.first,
+              attribute_names: ["QueueArn"]
+            )
+          rescue Aws::SQS::Errors::ServiceError => e
+            puts "[SidekiqSqsProcessor] WARNING: AWS credentials validation failed: #{e.class} - #{e.message}"
+            puts "[SidekiqSqsProcessor] Skipping poller start due to AWS configuration issues"
+            return false
+          end
+
           @running = true
           start_polling_threads
           puts "[SidekiqSqsProcessor] Polling threads started successfully"
