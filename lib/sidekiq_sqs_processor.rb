@@ -64,8 +64,7 @@ module SidekiqSqsProcessor
     def sqs_client
       @sqs_client ||= Aws::SQS::Client.new(
         region: configuration.aws_region,
-        access_key_id: configuration.aws_access_key_id,
-        secret_access_key: configuration.aws_secret_access_key
+        credentials: Aws::Credentials.new(configuration.aws_access_key_id, configuration.aws_secret_access_key)
       )
     end
 
@@ -92,7 +91,11 @@ module SidekiqSqsProcessor
     # Find all worker classes that inherit from SidekiqSqsProcessor::BaseWorker
     # @return [Array<Class>] Array of worker classes
     def worker_classes
-      ObjectSpace.each_object(Class).select { |c| c < BaseWorker rescue false }
+      ObjectSpace.each_object(Class).select do |c|
+        c < BaseWorker
+      rescue StandardError
+        false
+      end
     end
 
     # Get a worker class by name
@@ -100,6 +103,7 @@ module SidekiqSqsProcessor
     # @return [Class, nil] The worker class or nil if not found
     def find_worker_class(worker_name)
       return nil unless worker_name
+
       worker_name.constantize
     rescue NameError
       nil
@@ -116,7 +120,7 @@ module SidekiqSqsProcessor
 
       # Ensure the worker is a SidekiqSqsProcessor::BaseWorker
       unless worker_class < BaseWorker
-        raise ArgumentError, "Worker class must inherit from SidekiqSqsProcessor::BaseWorker"
+        raise ArgumentError, 'Worker class must inherit from SidekiqSqsProcessor::BaseWorker'
       end
 
       # Create a simulated SQS message
