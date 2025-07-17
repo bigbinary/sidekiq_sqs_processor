@@ -2,7 +2,7 @@
 
 [![Gem Version](https://badge.fury.io/rb/sidekiq_sqs_processor.svg)](https://badge.fury.io/rb/sidekiq_sqs_processor)
 
-A Ruby gem tha integrates Amazon SQS with Sidekiq for efficient and scalable message processing. Process SQS messages asynchronously with the power and monitoring capabilities of Sidekiq.
+A Ruby gem that integrates Amazon SQS with Sidekiq for efficient and scalable message processing. Process SQS messages asynchronously with the power and monitoring capabilities of Sidekiq.
 
 ## Features
 
