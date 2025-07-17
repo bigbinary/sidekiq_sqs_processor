@@ -319,6 +319,11 @@ After checking out the repo, run `bin/setup` to install dependencies. Then, run 
 
 To install this gem onto your local machine, run `bundle exec rake install`.
 
-## License
+## About BigBinary
 
-The gem is available as open source under the terms of the [MIT License](https://opensource.org/licenses/MIT).
+![BigBinary](https://raw.githubusercontent.com/bigbinary/bigbinary-assets/press-assets/PNG/logo-light-solid-small.png?raw=true)
+
+wheel is maintained by [BigBinary](https://www.bigbinary.com). BigBinary is a
+software consultancy company. We build web and mobile applications using Ruby on
+Rails, React.js and React Native.
+
